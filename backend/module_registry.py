@@ -249,10 +249,6 @@ class ModuleAddressPolicy:
                 for address in addresses
             ):
                 raise self.denied()
-            if parsed.scheme != "https" and not all(
-                self._ip_allowed(address) for address in addresses
-            ):
-                raise self.denied()
             return origin, [address.compressed for address in addresses]
         if not all(self._ip_allowed(address) for address in addresses):
             raise self.denied()

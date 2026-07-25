@@ -2050,9 +2050,6 @@ MODULE_NETWORK_NAME = os.environ.get(
     "CHATRAW_MODULE_NETWORK",
     "chatraw-modules",
 )
-LOOPBACK_DEV_MODE = (
-    os.environ.get("CHATRAW_LOOPBACK_DEV", "0") == "1" or TEST_MODE
-)
 TRUST_PROXY_HEADERS = os.environ.get("CHATRAW_TRUST_PROXY_HEADERS", "0") == "1"
 TRUSTED_PROXY_IPS = {
     item.strip()
@@ -2410,25 +2407,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         if not DEV_MODE and path in {"/docs", "/redoc", "/openapi.json"}:
             return JSONResponse({"detail": "Not Found"}, status_code=404)
 
-        external_scheme = _request_external_origin(request).split(":", 1)[0]
-        if not DEV_MODE and external_scheme != "https":
-            loopback_allowed = (
-                LOOPBACK_DEV_MODE and _is_loopback_request(request)
-            )
-            module_bridge_allowed = (
-                is_module_capability
-                and _is_module_bridge_request(request)
-            )
-            if not loopback_allowed and not module_bridge_allowed:
-                if path not in {"/health", "/ready"}:
-                    return JSONResponse(
-                        {
-                            "detail": "HTTPS is required",
-                            "code": "https_required",
-                        },
-                        status_code=400,
-                    )
-
         token = request.cookies.get(SESSION_COOKIE)
         principal = auth_service.authenticate(token)
         request.state.user = principal
@@ -2653,7 +2631,9 @@ async def auth_login(request: Request):
         token,
         max_age=30 * 24 * 60 * 60,
         httponly=True,
-        secure=not LOOPBACK_DEV_MODE,
+        secure=(
+            _request_external_origin(request).split(":", 1)[0] == "https"
+        ),
         samesite="lax",
         path="/",
     )
@@ -9351,12 +9331,18 @@ static_app = CachedStaticFiles(directory=os.path.join(BACKEND_DIR, "static"), ht
 gzipped_static_app = StaticGZip(static_app, minimum_size=500)
 app.mount("/", gzipped_static_app, name="static")
 
-if __name__ == "__main__":
+def run_server():
     import uvicorn
+
     logger.info(f"ChatRaw starting on http://0.0.0.0:{SERVER_PORT}")
     uvicorn.run(
         app,
         host="0.0.0.0",
         port=SERVER_PORT,
         log_level="info",
+        proxy_headers=False,
     )
+
+
+if __name__ == "__main__":
+    run_server()

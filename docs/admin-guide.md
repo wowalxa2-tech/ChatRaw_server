@@ -23,8 +23,7 @@
 python3 -m venv .venv
 .venv/bin/pip install -r backend/requirements.txt
 .venv/bin/python scripts/prepare-server-secrets.py --data-dir data
-DATA_DIR="$PWD/data" CHATRAW_LOOPBACK_DEV=1 \
-  .venv/bin/python backend/main.py
+DATA_DIR="$PWD/data" PORT=51111 .venv/bin/python backend/main.py
 ```
 
 #### Docker Compose
@@ -38,13 +37,13 @@ docker compose exec chatraw \
 
 访问 `/setup` 并创建首位管理员。Setup Token 只用于首次创建管理员；不要把它提交到 Git、聊天或工单。
 
-生产环境要求：
+部署要求：
 
-- HTTPS 终止于可信反向代理；
-- 反向代理保留正确的 Host 和 Origin；
+- 回环地址和局域网地址均可直接使用 HTTP，HTTPS 不是运行前提；
+- 如使用反向代理，应保留正确的 Host 和 Origin；
 - Server 数据目录或卷只对运行账户可写；
-- 不设置 `CHATRAW_LOOPBACK_DEV=1`；
 - 只发布 Server 端口，不发布模块或模块私有依赖端口。
+- 不要把未加密的 HTTP 服务暴露到公网或不受信任网络。
 
 `GET /health` 表示进程存活；`GET /ready` 还会验证数据库和 Schema。负载均衡应使用 `/ready`。
 
@@ -130,7 +129,7 @@ API 会同时返回稳定的错误 `code` 与英文诊断 `detail`；前端按 `
 推荐 Compose 拓扑：
 
 ```text
-浏览器 ──HTTPS──> ChatRaw Server
+浏览器 ──HTTP/HTTPS──> ChatRaw Server
                     │
           chatraw-modules 外部网桥
                     │
@@ -300,7 +299,8 @@ COMPOSE_PROJECT_NAME=chatraw-restored docker compose up -d
 
 #### 用户无法登录
 
-确认用户未被停用、密码是否已重置、浏览器是否访问正确 HTTPS 域名。检查服务器时间和反向代理 Origin/Host。
+确认用户未被停用、密码是否已重置、浏览器是否访问正确的服务器地址。
+检查服务器时间；如使用反向代理，再检查 Origin/Host。
 
 ### 13. 审计与验收
 
@@ -324,7 +324,10 @@ Administrators manage users, models, trusted frontend plugins, backend module co
 
 ### Installation
 
-Use the Source or Compose commands in the [README](../README.md). Protect the one-time Setup Token. Production requires HTTPS, a trusted reverse proxy, a protected data volume, and no loopback development mode.
+Use the Source or Compose commands in the [README](../README.md). Protect the
+one-time Setup Token. Loopback and LAN HTTP work by default; HTTPS through a
+trusted reverse proxy is optional. Protect the data volume and do not expose
+plain HTTP to public or untrusted networks.
 
 `/health` proves process liveness. `/ready` also checks the database and supported Schema and is the correct load-balancer target.
 

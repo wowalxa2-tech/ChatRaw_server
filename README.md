@@ -67,6 +67,8 @@ docker compose exec chatraw \
 ```
 
 打开 `http://127.0.0.1:51111/setup`，输入一次性 Setup Token，创建首位管理员。
+设备端口默认发布到宿主机 `0.0.0.0:51111`，因此回环地址和设备内网 IP
+都可以直接通过 HTTP 访问，不需要额外开关。
 
 正式 GitHub Release 发布后，自动化流程会构建并验证 `linux/amd64` 与 `linux/arm64`，再发布 `massif01/chatraw-server:<version>`；只有 Docker Hub manifest 验证成功的标签才应写入部署配置。
 
@@ -77,7 +79,8 @@ Compose 默认：
 - 将 Server 接入外部 `chatraw-modules` 网桥。
 - 模块可以加入网桥，但模块的私有依赖不应加入该网桥。
 
-生产环境必须在可信反向代理后使用 HTTPS。不要在公网环境开启 `CHATRAW_LOOPBACK_DEV=1`。
+ChatRaw 默认同时支持回环和局域网 HTTP。HTTPS 可以由可信反向代理提供，
+但不是运行前提。请勿把未加密的 HTTP 服务暴露到公网或不受信任网络。
 
 ### 源码运行
 
@@ -87,11 +90,13 @@ Compose 默认：
 python3 -m venv .venv
 .venv/bin/pip install -r backend/requirements.txt
 .venv/bin/python scripts/prepare-server-secrets.py --data-dir data
-DATA_DIR="$PWD/data" CHATRAW_LOOPBACK_DEV=1 \
-  .venv/bin/python backend/main.py
+DATA_DIR="$PWD/data" PORT=51111 .venv/bin/python backend/main.py
 ```
 
-使用 `prepare-server-secrets.py` 显示的一次性 Setup Token，打开 `http://127.0.0.1:51111/setup` 创建首位管理员。`CHATRAW_LOOPBACK_DEV=1` 只用于本机 HTTP 开发；正式部署必须使用 HTTPS。
+使用 `prepare-server-secrets.py` 显示的一次性 Setup Token，通过
+`http://127.0.0.1:51111/setup` 或 `http://<设备地址>:51111/setup`
+创建首位管理员。HTTP 登录 Cookie 不携带 `Secure`；实际通过 HTTPS
+访问时，登录 Cookie 会自动携带 `Secure`。
 
 ## 管理流程
 
@@ -249,11 +254,14 @@ docker compose exec chatraw \
   python -c "from pathlib import Path; print(Path('/app/data/secrets/setup-token').read_text().strip())"
 ```
 
-Open `http://127.0.0.1:51111/setup` and use the one-time Setup Token to create the first administrator.
+Open `http://127.0.0.1:51111/setup` and use the one-time Setup Token to create
+the first administrator. The port is published on host `0.0.0.0:51111`, so
+both loopback and the appliance LAN address work over HTTP without an extra
+configuration switch.
 
 After a formal GitHub Release, automation builds and verifies `linux/amd64` and `linux/arm64` before publishing `massif01/chatraw-server:<version>`. Only tags with a verified Docker Hub manifest should be used for deployment.
 
-The default Compose project exposes only the Server port, persists Server data in a named volume, and joins the external `chatraw-modules` bridge. Production deployments must use HTTPS behind a trusted reverse proxy. Never enable `CHATRAW_LOOPBACK_DEV=1` on a public deployment.
+The default Compose project exposes only the Server port, persists Server data in a named volume, and joins the external `chatraw-modules` bridge. ChatRaw accepts loopback and LAN HTTP by default. HTTPS may be provided by a trusted reverse proxy, but it is not required. Do not expose plain HTTP to the public Internet or an untrusted network.
 
 ### Source
 
@@ -263,11 +271,13 @@ Requires Python 3.11 or later.
 python3 -m venv .venv
 .venv/bin/pip install -r backend/requirements.txt
 .venv/bin/python scripts/prepare-server-secrets.py --data-dir data
-DATA_DIR="$PWD/data" CHATRAW_LOOPBACK_DEV=1 \
-  .venv/bin/python backend/main.py
+DATA_DIR="$PWD/data" PORT=51111 .venv/bin/python backend/main.py
 ```
 
-Open `http://127.0.0.1:51111/setup` with the one-time Setup Token printed by `prepare-server-secrets.py`. The loopback development flag is only for local HTTP use.
+Open `http://127.0.0.1:51111/setup` or
+`http://<device-address>:51111/setup` with the one-time Setup Token printed by
+`prepare-server-secrets.py`. Session cookies issued over HTTP omit `Secure`;
+cookies issued over HTTPS include `Secure` automatically.
 
 ## Module onboarding
 

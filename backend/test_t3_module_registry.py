@@ -317,16 +317,19 @@ class ModuleAddressPolicyTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ModuleRegistryError):
                 await policy.validate_and_resolve(address)
 
-    async def test_explicit_public_origin_requires_https(self):
+    async def test_explicit_public_origin_allows_http_and_https(self):
         https_origin = "https://8.8.8.8"
         policy = ModuleAddressPolicy(allowed_origins={https_origin})
         origin, _addresses = await policy.validate_and_resolve(https_origin)
         self.assertEqual(origin, https_origin)
+        http_origin = "http://8.8.8.8"
         http_policy = ModuleAddressPolicy(
-            allowed_origins={"http://8.8.8.8"}
+            allowed_origins={http_origin}
         )
-        with self.assertRaises(ModuleRegistryError):
-            await http_policy.validate_and_resolve("http://8.8.8.8")
+        origin, _addresses = await http_policy.validate_and_resolve(
+            http_origin
+        )
+        self.assertEqual(origin, http_origin)
 
 
 class ModuleHttpTransportTests(unittest.IsolatedAsyncioTestCase):

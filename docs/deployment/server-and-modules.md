@@ -31,6 +31,11 @@ python -m uvicorn --app-dir examples/reference-module app:app \
   --host 127.0.0.1 --port 8765
 ```
 
+The Server accepts HTTP on loopback and appliance LAN addresses by default,
+without a separate mode switch. HTTP login cookies omit `Secure`, while HTTPS
+login cookies include `Secure`. Do not expose plain HTTP to public or untrusted
+networks.
+
 Keep the generated code in the administrator's terminal or secret manager and
 enter it once under **Settings → Modules** when connecting
 `http://127.0.0.1:8765`. The module deliberately does not print the code. It
@@ -66,6 +71,9 @@ docker compose up -d --build
 docker compose -f examples/reference-module/compose.yml up -d --build
 docker compose -f examples/reference-module/compose.yml logs reference-module
 ```
+
+The published Server port accepts HTTP from loopback and appliance LAN
+addresses by default.
 
 In the WebUI, connect
 `http://chatraw-reference-module:8765`. Neither the module nor its private
@@ -208,6 +216,10 @@ python -m uvicorn --app-dir examples/reference-module app:app \
   --host 127.0.0.1 --port 8765
 ```
 
+Server 默认允许回环地址和设备局域网地址通过 HTTP 访问，无需额外模式开关。
+HTTP 登录 Cookie 不携带 `Secure`，HTTPS 登录 Cookie 自动携带 `Secure`。
+不得把未加密的 HTTP 服务暴露到公网或不受信任网络。
+
 部署者必须保管并显式注入一次性配对码，模块不会把它输出到日志。在
 **设置 → Modules** 中使用该配对码连接 `http://127.0.0.1:8765`，
 审核声明、完成配置并启用功能套件。
@@ -240,6 +252,8 @@ docker compose up -d --build
 docker compose -f examples/reference-module/compose.yml up -d --build
 docker compose -f examples/reference-module/compose.yml logs reference-module
 ```
+
+Compose 发布端口默认支持设备回环地址和局域网地址的 HTTP 访问。
 
 在 WebUI 中连接 `http://chatraw-reference-module:8765`。模块和私有依赖都
 不发布宿主机端口。参考模块同时加入共享北向网桥和内部私有网络；ChatRaw 不能

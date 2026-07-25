@@ -264,7 +264,6 @@ def _start_server(data_dir: Path) -> tuple[subprocess.Popen, str, Any]:
         {
             "DATA_DIR": str(data_dir),
             "PORT": str(port),
-            "CHATRAW_LOOPBACK_DEV": "1",
         }
     )
     process = subprocess.Popen(

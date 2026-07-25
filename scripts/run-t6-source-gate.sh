@@ -54,7 +54,6 @@ start_module() {
 start_server() {
     DATA_DIR="$server_data" \
     PORT="$server_port" \
-    CHATRAW_LOOPBACK_DEV=1 \
     "$python_bin" backend/main.py \
         >"$server_data/server.log" 2>&1 &
     server_pid=$!

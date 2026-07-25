@@ -110,7 +110,6 @@ linkdb_token() {
 start_server() {
     DATA_DIR="$server_data" \
     PORT="$server_port" \
-    CHATRAW_LOOPBACK_DEV=1 \
     "$server_python" "$server_root/backend/main.py" \
         >"$server_data/server.log" 2>&1 &
     server_pid=$!

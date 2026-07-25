@@ -14,8 +14,6 @@ backup_root="$state_dir/backups"
 compose_file="$root/docker-compose.yml"
 python_bin=${PYTHON_BIN:-"$root/.venv/bin/python"}
 
-export CHATRAW_LOOPBACK_DEV=1
-
 cleanup() {
     CHATRAW_PORT="$source_port" docker compose \
         -p "$source_project" -f "$compose_file" \

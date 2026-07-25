@@ -214,6 +214,196 @@ class T2AuthSecurityTests(unittest.TestCase):
         self.assertEqual(duplicate.status_code, 409)
         self.assertEqual(duplicate.json()["code"], "username_in_use")
 
+    def test_lan_http_allows_login_session_without_dev_flags(self):
+        client = TestClient(
+            main.app,
+            base_url="http://10.10.99.99:51111",
+        )
+        headers = {
+            "Origin": "http://10.10.99.99:51111",
+            "Sec-Fetch-Site": "same-origin",
+            "X-Forwarded-For": "192.0.2.21",
+        }
+        with (
+            patch.object(main, "DEV_MODE", False),
+            patch.object(main, "TEST_MODE", False),
+            patch.object(main, "TRUST_PROXY_HEADERS", True),
+            patch.object(main, "TRUSTED_PROXY_IPS", {"testclient"}),
+        ):
+            response = client.post(
+                "/api/auth/login",
+                headers=headers,
+                json={
+                    "username": "member-a",
+                    "password": MEMBER_PASSWORD,
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("HttpOnly", response.headers["set-cookie"])
+            self.assertNotIn("Secure", response.headers["set-cookie"])
+            authenticated = client.get("/api/me", headers=headers)
+            self.assertEqual(authenticated.status_code, 200)
+            self.assertEqual(authenticated.json()["username"], "member-a")
+
+    def test_loopback_http_allows_login_without_dev_flags(self):
+        client = TestClient(
+            main.app,
+            base_url="http://127.0.0.1:51111",
+        )
+        with (
+            patch.object(main, "DEV_MODE", False),
+            patch.object(main, "TEST_MODE", False),
+            patch.object(main, "TRUST_PROXY_HEADERS", True),
+            patch.object(main, "TRUSTED_PROXY_IPS", {"testclient"}),
+        ):
+            headers = {
+                "Origin": "http://127.0.0.1:51111",
+                "Sec-Fetch-Site": "same-origin",
+                "X-Forwarded-For": "192.0.2.22",
+            }
+            response = client.post(
+                "/api/auth/login",
+                headers=headers,
+                json={
+                    "username": "member-a",
+                    "password": MEMBER_PASSWORD,
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn("Secure", response.headers["set-cookie"])
+
+    def test_https_cookie_stays_secure(self):
+        client = TestClient(
+            main.app,
+            base_url="https://chatraw.internal",
+        )
+        with (
+            patch.object(main, "DEV_MODE", False),
+            patch.object(main, "TEST_MODE", False),
+            patch.object(main, "TRUST_PROXY_HEADERS", True),
+            patch.object(main, "TRUSTED_PROXY_IPS", {"testclient"}),
+        ):
+            headers = {
+                "Origin": "https://chatraw.internal",
+                "Sec-Fetch-Site": "same-origin",
+                "X-Forwarded-For": "192.0.2.23",
+            }
+            response = client.post(
+                "/api/auth/login",
+                headers=headers,
+                json={
+                    "username": "member-a",
+                    "password": MEMBER_PASSWORD,
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("Secure", response.headers["set-cookie"])
+
+    def test_untrusted_forwarded_https_does_not_mark_http_cookie_secure(self):
+        client = TestClient(
+            main.app,
+            base_url="http://10.10.99.99:51111",
+        )
+        with (
+            patch.object(main, "DEV_MODE", False),
+            patch.object(main, "TEST_MODE", False),
+            patch.object(main, "TRUST_PROXY_HEADERS", False),
+            patch.object(
+                main.RateLimitMiddleware,
+                "_get_client_ip",
+                return_value="192.0.2.24",
+            ),
+        ):
+            response = client.post(
+                "/api/auth/login",
+                headers={
+                    "Origin": "http://10.10.99.99:51111",
+                    "Sec-Fetch-Site": "same-origin",
+                    "X-Forwarded-Proto": "https",
+                    "X-Forwarded-Host": "spoofed.example",
+                    "X-Forwarded-For": "192.0.2.24",
+                },
+                json={
+                    "username": "member-a",
+                    "password": MEMBER_PASSWORD,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Secure", response.headers["set-cookie"])
+
+    def test_trusted_forwarded_https_keeps_cookie_secure(self):
+        client = TestClient(
+            main.app,
+            base_url="http://10.10.99.99:51111",
+        )
+        with (
+            patch.object(main, "DEV_MODE", False),
+            patch.object(main, "TEST_MODE", False),
+            patch.object(main, "TRUST_PROXY_HEADERS", True),
+            patch.object(main, "TRUSTED_PROXY_IPS", {"testclient"}),
+        ):
+            response = client.post(
+                "/api/auth/login",
+                headers={
+                    "Origin": "https://chatraw.internal",
+                    "Sec-Fetch-Site": "same-origin",
+                    "X-Forwarded-Proto": "https",
+                    "X-Forwarded-Host": "chatraw.internal",
+                    "X-Forwarded-For": "192.0.2.25",
+                },
+                json={
+                    "username": "member-a",
+                    "password": MEMBER_PASSWORD,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Secure", response.headers["set-cookie"])
+
+    def test_trusted_forwarded_http_keeps_cookie_without_secure(self):
+        client = TestClient(
+            main.app,
+            base_url="http://10.10.99.99:51111",
+        )
+        forwarded_headers = {
+            "Origin": "http://chatraw.internal",
+            "Sec-Fetch-Site": "same-origin",
+            "X-Forwarded-Proto": "http",
+            "X-Forwarded-Host": "chatraw.internal",
+            "X-Forwarded-For": "192.0.2.26",
+        }
+        with (
+            patch.object(main, "DEV_MODE", False),
+            patch.object(main, "TEST_MODE", False),
+            patch.object(main, "TRUST_PROXY_HEADERS", True),
+            patch.object(main, "TRUSTED_PROXY_IPS", {"testclient"}),
+        ):
+            response = client.post(
+                "/api/auth/login",
+                headers=forwarded_headers,
+                json={
+                    "username": "member-a",
+                    "password": MEMBER_PASSWORD,
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn("Secure", response.headers["set-cookie"])
+            authenticated = client.get(
+                "/api/me",
+                headers=forwarded_headers,
+            )
+            self.assertEqual(authenticated.status_code, 200)
+
+    def test_source_server_disables_uvicorn_proxy_header_processing(self):
+        with patch("uvicorn.run") as uvicorn_run:
+            main.run_server()
+        uvicorn_run.assert_called_once_with(
+            main.app,
+            host="0.0.0.0",
+            port=main.SERVER_PORT,
+            log_level="info",
+            proxy_headers=False,
+        )
+
     def test_password_hashes_use_argon2id(self):
         with main.db.connection() as connection:
             hashes = [
@@ -263,7 +453,7 @@ class T2AuthSecurityTests(unittest.TestCase):
                     self.assertEqual(response.status_code, 401, key)
         self.assertGreater(len(checked), 50)
 
-    def test_origin_and_https_controls(self):
+    def test_origin_and_csrf_controls(self):
         client = self.member_client()
         response = client.post("/api/chats")
         self.assertEqual(response.status_code, 403)

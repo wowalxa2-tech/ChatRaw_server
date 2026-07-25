@@ -132,6 +132,19 @@ class ModulePluginSdkContractTests(unittest.TestCase):
                     return {{ click() {{}}, set href(value) {{}}, set download(value) {{}} }};
                 }}
             }};
+            let randomFillCalls = 0;
+            Object.defineProperty(global, 'crypto', {{
+                configurable: true,
+                value: {{
+                    getRandomValues(target) {{
+                        randomFillCalls += 1;
+                        for (let index = 0; index < target.length; index += 1) {{
+                            target[index] = index;
+                        }}
+                        return target;
+                    }}
+                }}
+            }});
 
             vm.runInThisContext(
                 fs.readFileSync({json.dumps(str(APP_PATH))}, 'utf8'),
@@ -258,6 +271,47 @@ class ModulePluginSdkContractTests(unittest.TestCase):
                         && error.code === 'task_resource_forbidden'
                         && error.status === 403
                 );
+
+                queue.push(response(200, {{
+                    task_id: 'task-uuid-fallback',
+                    state: 'queued',
+                    artifacts: []
+                }}));
+                const started = await sdk.startTask(
+                    {{
+                        module_id: 'example.module',
+                        action_id: 'example.run',
+                        input: {{}}
+                    }},
+                    {{ presentation: 'embedded' }}
+                );
+                assert.equal(started.task_id, 'task-uuid-fallback');
+                assert.equal(randomFillCalls, 1);
+                assert.equal(requests.at(-1).url, '/api/module-tasks');
+                assert.match(
+                    requests.at(-1).options.headers['Idempotency-Key'],
+                    /^[0-9a-f]{{8}}-[0-9a-f]{{4}}-4[0-9a-f]{{3}}-[89ab][0-9a-f]{{3}}-[0-9a-f]{{12}}$/
+                );
+
+                queue.push(response(200, {{
+                    task_id: 'task-explicit-key',
+                    state: 'queued',
+                    artifacts: []
+                }}));
+                await sdk.startTask(
+                    {{
+                        module_id: 'example.module',
+                        action_id: 'example.run',
+                        input: {{}},
+                        idempotency_key: 'caller-supplied-key'
+                    }},
+                    {{ presentation: 'embedded' }}
+                );
+                assert.equal(
+                    requests.at(-1).options.headers['Idempotency-Key'],
+                    'caller-supplied-key'
+                );
+                assert.equal(randomFillCalls, 1);
                 assert.equal(queue.length, 0);
             }})().catch(error => {{
                 console.error(error);

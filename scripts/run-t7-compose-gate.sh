@@ -51,7 +51,6 @@ for path in "$agent_root" "$linkdb_root" "$plugin_root"; do
 done
 
 export CHATRAW_PORT="$server_port"
-export CHATRAW_LOOPBACK_DEV=1
 export CHATRAW_AGENT_MODULE_PAIRING_CODE="$pairing_code"
 export CHATRAW_AGENT_MODULE_HOST_BASE_URL="http://chatraw-server:51111"
 export CHATRAW_AGENT_LINKDB_BASE_URL="http://chatraw-linkdb:8765"

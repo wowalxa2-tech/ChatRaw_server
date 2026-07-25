@@ -46,7 +46,6 @@ wait_for_url() {
 }
 
 export CHATRAW_PORT="$server_port"
-export CHATRAW_LOOPBACK_DEV=1
 export REFERENCE_MODULE_PAIRING_CODE="$pairing_code"
 
 ./scripts/create-module-network.sh
